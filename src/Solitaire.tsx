@@ -185,7 +185,28 @@ function Solitaire() {
               alignItems: "center",
               justifyContent: "center",
               color: "#fff",
-              cursor: gameState.stock.length ? "pointer" : "not-allowed",
+              cursor: (gameState.stock.length || gameState.waste.length) ? "pointer" : "not-allowed",
+              userSelect: "none",
+            }}
+            onClick={() => {
+              if (gameState.stock.length > 0) {
+                // Draw from stock to waste
+                const stock = [...gameState.stock];
+                const cardDrawn = { ...stock.pop()!, faceUp: true };
+                setGameState({
+                  ...gameState,
+                  stock,
+                  waste: [...gameState.waste, cardDrawn]
+                });
+              } else if (gameState.waste.length > 0) {
+                // Recycle waste to stock (face down)
+                const stock = gameState.waste.map(c => ({ ...c, faceUp: false })).reverse();
+                setGameState({
+                  ...gameState,
+                  stock,
+                  waste: []
+                });
+              }
             }}
           >
             {gameState.stock.length ? "🂠" : ""}
