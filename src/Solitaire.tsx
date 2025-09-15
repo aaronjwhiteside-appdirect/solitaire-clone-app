@@ -13,19 +13,22 @@ type Card = {
   id: string;
 };
 
-// Generate a full solitaire deck
-function generateShuffledDeck(): Card[] {
+// Generate the Spider Solitaire deck: 104 cards, 2 suits by default, two full decks
+function generateShuffledSpiderDeck(numSuits: number = 2): Card[] {
+  const suits = SUITS.slice(0, numSuits);
   const deck: Card[] = [];
-  SUITS.forEach((suit) => {
-    RANKS.forEach((rank) => {
-      deck.push({
-        suit,
-        rank,
-        faceUp: false,
-        id: `${suit}${rank}`,
+  for (let d = 0; d < 2; d++) {
+    suits.forEach(suit => {
+      RANKS.forEach(rank => {
+        deck.push({
+          suit,
+          rank,
+          faceUp: false,
+          id: `${suit}${rank}-${d}-${Math.random().toString(36).substr(2,5)}` // ensure unique
+        });
       });
     });
-  });
+  }
   // Fisher-Yates shuffle
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -34,21 +37,23 @@ function generateShuffledDeck(): Card[] {
   return deck;
 }
 
-// Initial Solitaire board setup
-function dealTableau(deck: Card[]): {
+
+// Initial Spider Solitaire board setup (10 columns)
+function dealSpiderTableau(deck: Card[]): {
   tableau: Card[][];
   stock: Card[];
 } {
-  const tableau: Card[][] = [];
+  const tableau: Card[][] = Array.from({ length: 10 }, () => []);
   let idx = 0;
-
-  for (let col = 0; col < 7; col++) {
-    tableau[col] = [];
-    for (let row = 0; row <= col; row++) {
-      const card = { ...deck[idx], faceUp: row === col };
-      tableau[col].push(card);
-      idx++;
+  // First 4 columns get 6 cards, last 6 get 5 each (per classic Spider rules)
+  for (let col = 0; col < 10; col++) {
+    const numCards = col < 4 ? 6 : 5;
+    for (let row = 0; row < numCards; row++, idx++) {
+      tableau[col].push({ ...deck[idx], faceUp: false });
     }
+    // Top card face up
+    if (tableau[col].length > 0)
+      tableau[col][tableau[col].length - 1].faceUp = true;
   }
   const stock = deck.slice(idx);
   return { tableau, stock };
@@ -59,15 +64,15 @@ function Solitaire() {
 type GameState = {
   tableau: Card[][];
   stock: Card[];
-  foundations: Card[][];
+  completedRuns: number;
 };
   function generateInitialState(): GameState {
-    const deck = generateShuffledDeck();
-    const { tableau, stock } = dealTableau(deck);
+    const deck = generateShuffledSpiderDeck(2); // 2-suit Spider
+    const { tableau, stock } = dealSpiderTableau(deck);
     return {
       tableau,
       stock,
-      foundations: [[], [], [], []],
+      completedRuns: 0
     };
   }
   const [gameState, setGameState] = useState<GameState>(generateInitialState);
@@ -152,30 +157,10 @@ type GameState = {
         <h2>Solitaire</h2>
         <button onClick={() => setGameState(generateInitialState())} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: "#229", color: "#fff", border: "none", cursor: "pointer" }}>Restart Game</button>
       </div>
-      <div style={{ display: "flex", gap: 24, marginBottom: 32 }}>
-        {/* Foundations */}
-        <div style={{ display: "flex", gap: 12 }}>
-          {gameState.foundations.map((pile, i) => (
-            <div
-              key={`foundation-${i}`}
-              style={{
-                width: 40,
-                height: 60,
-                border: "2px dashed #229",
-                borderRadius: 4,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "#f9f9f9",
-              }}
-            >
-              {pile.length > 0 && (
-                <div>{pile[pile.length - 1].rank}{pile[pile.length - 1].suit}</div>
-              )}
-            </div>
-          ))}
+      <div style={{ display: "flex", gap: 32, marginBottom: 32 }}>
+        <div style={{ fontWeight: 600, fontSize: 18 }}>
+          Completed Stacks: {gameState.completedRuns}
         </div>
-        {/* Stock & Waste */}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {/* Stock */}
           <div
@@ -192,8 +177,10 @@ type GameState = {
               cursor: gameState.stock.length ? "pointer" : "not-allowed",
               userSelect: "none",
             }}
-            title="Deal one card on top of each stack"
+            title="Deal one card on top of each stack (if all tableau columns are non-empty)"
+            // Stock deal logic will be updated in spider-deal step!
             onClick={() => {
+              // (spider deal enforcement in next step)
               if (!gameState.stock.length) return;
               let stock = [...gameState.stock];
               const tableau = gameState.tableau.map(col => {
@@ -213,15 +200,14 @@ type GameState = {
           >
             {gameState.stock.length ? "🂠" : ""}
           </div>
-          {/* Waste is not used in this variant; removed */}
         </div>
       </div>
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-        {/* Tableau */}
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+        {/* Tableau: 10 columns */}
         {gameState.tableau.map((pile, colIdx) => (
           <div
             key={`tab-${colIdx}`}
-            style={{ width: 40, minHeight: 240, position: "relative" }}
+            style={{ width: 40, minHeight: 300, position: "relative" }}
             onDragOver={e => {
               if (dragState) {
                 e.preventDefault();
@@ -229,7 +215,7 @@ type GameState = {
             }}
             onDrop={dragState ? (e) => {
               e.preventDefault();
-              // Drop logic: move if legal
+              // Drop logic: move if legal (Rules to be handled in next todos)
               const movingCards = gameState.tableau[dragState.fromCol].slice(dragState.fromRow);
               const destPile = gameState.tableau[colIdx];
               if (canDropCard(movingCards[0], destPile)) {
