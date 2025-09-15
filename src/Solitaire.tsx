@@ -67,7 +67,7 @@ type GameState = {
   completedRuns: number;
 };
   function generateInitialState(): GameState {
-    const deck = generateShuffledSpiderDeck(2); // 2-suit Spider
+    const deck = generateShuffledSpiderDeck(4); // 4-suit Spider
     const { tableau, stock } = dealSpiderTableau(deck);
     return {
       tableau,
