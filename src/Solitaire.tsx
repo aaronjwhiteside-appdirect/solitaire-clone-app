@@ -62,7 +62,7 @@ function Solitaire() {
     waste: Card[];
     foundations: Card[][];
   };
-  const [gameState, setGameState] = useState<GameState>(() => {
+  function generateInitialState(): GameState {
     const deck = generateShuffledDeck();
     const { tableau, stock } = dealTableau(deck);
     return {
@@ -71,7 +71,8 @@ function Solitaire() {
       waste: [],
       foundations: [[], [], [], []],
     };
-  });
+  }
+  const [gameState, setGameState] = useState<GameState>(generateInitialState);
   // [click-to-move selection state removed]
   const [dragState, setDragState] = useState<{ fromCol: number, fromRow: number }|null>(null);
 
@@ -147,7 +148,10 @@ function Solitaire() {
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>Solitaire</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <h2>Solitaire</h2>
+        <button onClick={() => setGameState(generateInitialState())} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: "#229", color: "#fff", border: "none", cursor: "pointer" }}>Restart Game</button>
+      </div>
       <div style={{ display: "flex", gap: 24, marginBottom: 32 }}>
         {/* Foundations */}
         <div style={{ display: "flex", gap: 12 }}>
