@@ -76,7 +76,7 @@ type GameState = {
 
   // Helper to render a card visually, with click for moving tableau cards
   function renderCard(card: Card, colIdx: number, rowIdx: number, isTop: boolean) {
-    // A card is draggable if it is faceUp and all cards above are also faceUp
+    // Can drag any face-up card that has only face-up cards above it
     const pile = gameState.tableau[colIdx];
     const isDraggable = card.faceUp && pile.slice(0, rowIdx).every(c => c.faceUp);
     return (
@@ -103,8 +103,12 @@ type GameState = {
           fontWeight: "bold",
           fontSize: "1.2rem",
           position: "relative",
-          cursor: card.faceUp && isDraggable ? "pointer" : "default",
+          cursor: card.faceUp && isDraggable ? "grab" : "default",
+          opacity: dragState && dragState.fromCol === colIdx && dragState.fromRow === rowIdx ? 0.5 : 1,
         }}
+        // Allow focusing with keyboard for accessibility (optional)
+        tabIndex={isDraggable ? 0 : undefined}
+        title={isDraggable ? "Drag this card and all below it as a group" : undefined}
       >
         {card.faceUp ? `${card.rank}${card.suit}` : ""}
       </div>
