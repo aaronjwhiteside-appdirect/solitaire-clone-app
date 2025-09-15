@@ -133,7 +133,7 @@ type GameState = {
   // Helper: can a card/group be dropped on target pile?
   function canDropCard(card: Card, destination: Card[]) {
     if (destination.length === 0) {
-      return card.rank === "K"; // Only Kings on empty
+      return true; // Any card can go to empty slot
     }
     const destCard = destination[destination.length - 1];
     const rankValue = (r: string) => RANKS.indexOf(r);
