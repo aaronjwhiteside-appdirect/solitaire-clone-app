@@ -119,36 +119,66 @@ type GameState = {
     );
   }
 
-  // Move cards within tableau
-  function doTableauMove(fromCol: number, fromRow: number, toCol: number) {
-    const movingCards = gameState.tableau[fromCol].slice(fromRow);
-    const newTableau = gameState.tableau.map((p, idx) => {
-      if (idx === fromCol) {
-        return p.slice(0, fromRow);
-      } else if (idx === toCol) {
-        return [...p, ...movingCards];
-      } else {
-        return p;
-      }
-    });
-    // Flip next card if any left
-    const justMovedFrom = newTableau[fromCol];
-    if (justMovedFrom.length && !justMovedFrom[justMovedFrom.length-1].faceUp) {
-      justMovedFrom[justMovedFrom.length-1] = {
-        ...justMovedFrom[justMovedFrom.length-1], faceUp: true };
+  // Helper: is group of cards a valid contiguous, same-suit descending Spider run (all face up)?
+  function isValidSpiderRun(cards: Card[]): boolean {
+    if (cards.length < 2) return true;
+    for (let i = 0; i < cards.length - 1; i++) {
+      if (!cards[i].faceUp || !cards[i+1].faceUp) return false;
+      if (cards[i].suit !== cards[i+1].suit) return false;
+      if (RANKS.indexOf(cards[i].rank) !== RANKS.indexOf(cards[i+1].rank) + 1) return false;
     }
-    setGameState({ ...gameState, tableau: newTableau });
+    return true;
   }
 
-  // Helper: can a card/group be dropped on target pile?
+  // Move cards within tableau (Spider: run drag only if valid run or single card; auto-clear K-A)
+  function doTableauMove(fromCol: number, fromRow: number, toCol: number) {
+    const movingCards = gameState.tableau[fromCol].slice(fromRow);
+    // Only allow move if single card or valid in-suit descending run
+    if (movingCards.length === 1 || isValidSpiderRun(movingCards)) {
+      let newTableau = gameState.tableau.map((p, idx) => {
+        if (idx === fromCol) {
+          return p.slice(0, fromRow);
+        } else if (idx === toCol) {
+          return [...p, ...movingCards];
+        } else {
+          return p;
+        }
+      });
+      // Flip next card if any left in original column
+      const justMovedFrom = newTableau[fromCol];
+      if (justMovedFrom.length && !justMovedFrom[justMovedFrom.length-1].faceUp) {
+        justMovedFrom[justMovedFrom.length-1] = {
+          ...justMovedFrom[justMovedFrom.length-1], faceUp: true };
+      }
+      // Auto-clear K-A in-suit and all face-up runs after every move
+      let completedRuns = gameState.completedRuns;
+      for (let col = 0; col < 10; col++) {
+        const pile = newTableau[col];
+        if (pile.length >= 13) {
+          const last13 = pile.slice(-13);
+          if (
+            last13.every(card => card.suit === last13[0].suit && card.faceUp) &&
+            last13.map(card => card.rank).join(",") === RANKS.slice().reverse().join(",")
+          ) {
+            // Remove the sequence
+            newTableau[col] = pile.slice(0, pile.length - 13);
+            completedRuns += 1;
+          }
+        }
+      }
+      setGameState({ ...gameState, tableau: newTableau, completedRuns });
+    }
+  }
+
+  // Helper: can a card/group be dropped on target pile (Spider)
   function canDropCard(card: Card, destination: Card[]) {
     if (destination.length === 0) {
-      return true; // Any card can go to empty slot
+      return true; // Allow any group/card to empty spot
     }
     const destCard = destination[destination.length - 1];
     const rankValue = (r: string) => RANKS.indexOf(r);
-    // Allow stacking if card value is less than dest value (any difference), suits/colors ignored
-    return rankValue(card.rank) < rankValue(destCard.rank);
+    // Spider: Only allow drop if card is one lower in rank and same suit as destination
+    return rankValue(card.rank) === rankValue(destCard.rank) - 1 && card.suit === destCard.suit;
   }
 
   return (
@@ -180,8 +210,9 @@ type GameState = {
             title="Deal one card on top of each stack (if all tableau columns are non-empty)"
             // Stock deal logic will be updated in spider-deal step!
             onClick={() => {
-              // (spider deal enforcement in next step)
+              // Only allow spider-style deal if ALL cols non-empty
               if (!gameState.stock.length) return;
+              if (gameState.tableau.some(col => col.length === 0)) return;
               let stock = [...gameState.stock];
               const tableau = gameState.tableau.map(col => {
                 if (stock.length > 0) {
