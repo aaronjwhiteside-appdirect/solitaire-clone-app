@@ -76,47 +76,35 @@ function Solitaire() {
     colIdx: number;
     rowIdx: number;
   } | null>(null);
+  const [dragState, setDragState] = useState<{ fromCol: number, fromRow: number }|null>(null);
 
   // Helper to render a card visually, with click for moving tableau cards
   function renderCard(card: Card, colIdx: number, rowIdx: number, isTop: boolean) {
     const isSelected = selected?.colIdx === colIdx && selected?.rowIdx === rowIdx;
+    const isDraggable = card.faceUp && isTop;
     return (
       <div
         key={card.id}
+        draggable={isDraggable}
+        onDragStart={isDraggable ? (e) => {
+          setDragState({ fromCol: colIdx, fromRow: rowIdx });
+          e.dataTransfer.effectAllowed = "move";
+        } : undefined}
+        onDragEnd={() => setDragState(null)}
         onClick={() => {
           if (!card.faceUp) return;
           if (selected === null && isTop) {
-            // select this card as moving-from
             setSelected({ colIdx, rowIdx });
           } else if (selected && (colIdx !== selected.colIdx || rowIdx !== selected.rowIdx)) {
-            // move selected to here if move is legal
-            // basic check: only move onto empty pile or alternating color, descending value
             const movingCards = gameState.tableau[selected.colIdx].slice(selected.rowIdx);
             const destPile = gameState.tableau[colIdx];
             const canDrop = canDropCard(movingCards[0], destPile);
             if (canDrop) {
-              const newTableau = gameState.tableau.map((p, idx) => {
-                if (idx === selected.colIdx) {
-                  return p.slice(0, selected.rowIdx);
-                } else if (idx === colIdx) {
-                  return [...p, ...movingCards];
-                } else {
-                  return p;
-                }
-              });
-              // Flip next card if any left in from-pile
-              const justMovedFrom = newTableau[selected.colIdx];
-              if (justMovedFrom.length && !justMovedFrom[justMovedFrom.length-1].faceUp) {
-                justMovedFrom[justMovedFrom.length-1] = {
-                  ...justMovedFrom[justMovedFrom.length-1],
-                  faceUp: true,
-                };
-              }
-              setGameState({ ...gameState, tableau: newTableau });
+              doTableauMove(selected.colIdx, selected.rowIdx, colIdx);
               setSelected(null);
               return;
             }
-            setSelected(null); // invalid drop, just unselect
+            setSelected(null);
           } else {
             setSelected(null);
           }
@@ -143,6 +131,27 @@ function Solitaire() {
         {card.faceUp ? `${card.rank}${card.suit}` : ""}
       </div>
     );
+  }
+
+  // Move cards within tableau
+  function doTableauMove(fromCol: number, fromRow: number, toCol: number) {
+    const movingCards = gameState.tableau[fromCol].slice(fromRow);
+    const newTableau = gameState.tableau.map((p, idx) => {
+      if (idx === fromCol) {
+        return p.slice(0, fromRow);
+      } else if (idx === toCol) {
+        return [...p, ...movingCards];
+      } else {
+        return p;
+      }
+    });
+    // Flip next card if any left
+    const justMovedFrom = newTableau[fromCol];
+    if (justMovedFrom.length && !justMovedFrom[justMovedFrom.length-1].faceUp) {
+      justMovedFrom[justMovedFrom.length-1] = {
+        ...justMovedFrom[justMovedFrom.length-1], faceUp: true };
+    }
+    setGameState({ ...gameState, tableau: newTableau });
   }
 
   // Helper: can a card/group be dropped on target pile?
@@ -215,7 +224,25 @@ function Solitaire() {
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
         {/* Tableau */}
         {gameState.tableau.map((pile, colIdx) => (
-          <div key={`tab-${colIdx}`} style={{ width: 40, minHeight: 240, position: "relative" }}>
+          <div
+            key={`tab-${colIdx}`}
+            style={{ width: 40, minHeight: 240, position: "relative" }}
+            onDragOver={e => {
+              if (dragState) {
+                e.preventDefault();
+              }
+            }}
+            onDrop={dragState ? (e) => {
+              e.preventDefault();
+              // Drop logic: move if legal
+              const movingCards = gameState.tableau[dragState.fromCol].slice(dragState.fromRow);
+              const destPile = gameState.tableau[colIdx];
+              if (canDropCard(movingCards[0], destPile)) {
+                doTableauMove(dragState.fromCol, dragState.fromRow, colIdx);
+                setDragState(null);
+              }
+            } : undefined}
+          >
             {pile.map((card, rowIdx) =>
               renderCard(card, colIdx, rowIdx, rowIdx === pile.length - 1 && card.faceUp)
             )}
