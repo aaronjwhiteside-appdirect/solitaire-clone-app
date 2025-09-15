@@ -65,6 +65,7 @@ type GameState = {
   tableau: Card[][];
   stock: Card[];
   completedRuns: number;
+  moves: number;
 };
   function generateInitialState(): GameState {
     const deck = generateShuffledSpiderDeck(4); // 4-suit Spider
@@ -72,7 +73,8 @@ type GameState = {
     return {
       tableau,
       stock,
-      completedRuns: 0
+      completedRuns: 0,
+      moves: 0
     };
   }
   const [gameState, setGameState] = useState<GameState>(generateInitialState);
@@ -166,7 +168,7 @@ type GameState = {
           }
         }
       }
-      setGameState({ ...gameState, tableau: newTableau, completedRuns });
+      setGameState({ ...gameState, tableau: newTableau, completedRuns, moves: gameState.moves + 1 });
     }
   }
 
@@ -189,7 +191,7 @@ type GameState = {
       </div>
       <div style={{ display: "flex", gap: 32, marginBottom: 32 }}>
         <div style={{ fontWeight: 600, fontSize: 18 }}>
-          Completed Stacks: {gameState.completedRuns}
+          Completed Stacks: {gameState.completedRuns} &nbsp; Moves: {gameState.moves}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {/* Stock */}
@@ -225,7 +227,8 @@ type GameState = {
               setGameState({
                 ...gameState,
                 tableau,
-                stock
+                stock,
+                moves: gameState.moves + 1
               });
             }}
           >
