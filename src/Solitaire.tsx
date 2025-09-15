@@ -138,12 +138,9 @@ function Solitaire() {
       return card.rank === "K"; // Only Kings on empty
     }
     const destCard = destination[destination.length - 1];
-    // Alternating color
-    const red = (suit: string) => suit === "♥" || suit === "♦";
-    const isOpposite = red(card.suit) !== red(destCard.suit);
-    // Descending
     const rankValue = (r: string) => RANKS.indexOf(r);
-    return isOpposite && rankValue(card.rank) === rankValue(destCard.rank) - 1;
+    // Allow stacking if card value is less than dest value (any difference), suits/colors ignored
+    return rankValue(card.rank) < rankValue(destCard.rank);
   }
 
   return (
