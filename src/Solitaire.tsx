@@ -72,15 +72,11 @@ function Solitaire() {
       foundations: [[], [], [], []],
     };
   });
-  const [selected, setSelected] = useState<{
-    colIdx: number;
-    rowIdx: number;
-  } | null>(null);
+  // [click-to-move selection state removed]
   const [dragState, setDragState] = useState<{ fromCol: number, fromRow: number }|null>(null);
 
   // Helper to render a card visually, with click for moving tableau cards
   function renderCard(card: Card, colIdx: number, rowIdx: number, isTop: boolean) {
-    const isSelected = selected?.colIdx === colIdx && selected?.rowIdx === rowIdx;
     const isDraggable = card.faceUp && isTop;
     return (
       <div
@@ -91,29 +87,11 @@ function Solitaire() {
           e.dataTransfer.effectAllowed = "move";
         } : undefined}
         onDragEnd={() => setDragState(null)}
-        onClick={() => {
-          if (!card.faceUp) return;
-          if (selected === null && isTop) {
-            setSelected({ colIdx, rowIdx });
-          } else if (selected && (colIdx !== selected.colIdx || rowIdx !== selected.rowIdx)) {
-            const movingCards = gameState.tableau[selected.colIdx].slice(selected.rowIdx);
-            const destPile = gameState.tableau[colIdx];
-            const canDrop = canDropCard(movingCards[0], destPile);
-            if (canDrop) {
-              doTableauMove(selected.colIdx, selected.rowIdx, colIdx);
-              setSelected(null);
-              return;
-            }
-            setSelected(null);
-          } else {
-            setSelected(null);
-          }
-        }}
         style={{
           width: 40,
           height: 60,
           borderRadius: 4,
-          border: isSelected ? "3px solid orange" : "1px solid #333",
+          border: "1px solid #333",
           background: card.faceUp ? "#fff" : "#bbb",
           color: card.suit === "♥" || card.suit === "♦" ? "red" : "black",
           marginTop: -48,
@@ -124,7 +102,6 @@ function Solitaire() {
           fontWeight: "bold",
           fontSize: "1.2rem",
           position: "relative",
-          outline: isSelected ? "2px solid orange" : undefined,
           cursor: card.faceUp ? (isTop ? "pointer" : "default") : undefined,
         }}
       >
@@ -249,11 +226,7 @@ function Solitaire() {
           </div>
         ))}
       </div>
-      {selected && (
-        <div style={{ marginTop: 12, color: "orange" }}>
-          Selected card: {gameState.tableau[selected.colIdx][selected.rowIdx].rank}{gameState.tableau[selected.colIdx][selected.rowIdx].suit}
-        </div>
-      )}
+      {/* Selection banner removed for drag-and-drop-only play */}
     </div>
   );
 }
