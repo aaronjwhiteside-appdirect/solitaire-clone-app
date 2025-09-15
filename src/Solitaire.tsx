@@ -76,9 +76,8 @@ type GameState = {
 
   // Helper to render a card visually, with click for moving tableau cards
   function renderCard(card: Card, colIdx: number, rowIdx: number, isTop: boolean) {
-    // Can drag any face-up card that has only face-up cards above it
-    const pile = gameState.tableau[colIdx];
-    const isDraggable = card.faceUp && pile.slice(0, rowIdx).every(c => c.faceUp);
+    // Can drag any face-up card (regardless of face status of parents)
+    const isDraggable = card.faceUp;
     return (
       <div
         key={card.id}
