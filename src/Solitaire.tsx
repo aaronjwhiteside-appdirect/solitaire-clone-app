@@ -56,19 +56,17 @@ function dealTableau(deck: Card[]): {
 
 
 function Solitaire() {
-  type GameState = {
-    tableau: Card[][];
-    stock: Card[];
-    waste: Card[];
-    foundations: Card[][];
-  };
+type GameState = {
+  tableau: Card[][];
+  stock: Card[];
+  foundations: Card[][];
+};
   function generateInitialState(): GameState {
     const deck = generateShuffledDeck();
     const { tableau, stock } = dealTableau(deck);
     return {
       tableau,
       stock,
-      waste: [],
       foundations: [[], [], [], []],
     };
   }
@@ -186,38 +184,31 @@ function Solitaire() {
               alignItems: "center",
               justifyContent: "center",
               color: "#fff",
-              cursor: (gameState.stock.length || gameState.waste.length) ? "pointer" : "not-allowed",
+              cursor: gameState.stock.length ? "pointer" : "not-allowed",
               userSelect: "none",
             }}
+            title="Deal one card on top of each stack"
             onClick={() => {
-              if (gameState.stock.length > 0) {
-                // Draw from stock to waste
-                const stock = [...gameState.stock];
-                const cardDrawn = { ...stock.pop()!, faceUp: true };
-                setGameState({
-                  ...gameState,
-                  stock,
-                  waste: [...gameState.waste, cardDrawn]
-                });
-              } else if (gameState.waste.length > 0) {
-                // Recycle waste to stock (face down)
-                const stock = gameState.waste.map(c => ({ ...c, faceUp: false })).reverse();
-                setGameState({
-                  ...gameState,
-                  stock,
-                  waste: []
-                });
-              }
+              if (!gameState.stock.length) return;
+              let stock = [...gameState.stock];
+              const tableau = gameState.tableau.map(col => {
+                if (stock.length > 0) {
+                  const card = { ...stock.pop()!, faceUp: true };
+                  return [...col, card];
+                } else {
+                  return col;
+                }
+              });
+              setGameState({
+                ...gameState,
+                tableau,
+                stock
+              });
             }}
           >
             {gameState.stock.length ? "🂠" : ""}
           </div>
-          {/* Waste */}
-          <div style={{ width: 40, height: 60 }}>
-            {gameState.waste.length > 0 && (
-              <div>{gameState.waste[gameState.waste.length - 1].rank}{gameState.waste[gameState.waste.length - 1].suit}</div>
-            )}
-          </div>
+          {/* Waste is not used in this variant; removed */}
         </div>
       </div>
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
