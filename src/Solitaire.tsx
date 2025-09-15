@@ -76,7 +76,9 @@ type GameState = {
 
   // Helper to render a card visually, with click for moving tableau cards
   function renderCard(card: Card, colIdx: number, rowIdx: number, isTop: boolean) {
-    const isDraggable = card.faceUp && isTop;
+    // A card is draggable if it is faceUp and all cards above are also faceUp
+    const pile = gameState.tableau[colIdx];
+    const isDraggable = card.faceUp && pile.slice(0, rowIdx).every(c => c.faceUp);
     return (
       <div
         key={card.id}
@@ -101,7 +103,7 @@ type GameState = {
           fontWeight: "bold",
           fontSize: "1.2rem",
           position: "relative",
-          cursor: card.faceUp ? (isTop ? "pointer" : "default") : undefined,
+          cursor: card.faceUp && isDraggable ? "pointer" : "default",
         }}
       >
         {card.faceUp ? `${card.rank}${card.suit}` : ""}
