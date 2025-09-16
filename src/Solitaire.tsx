@@ -82,7 +82,7 @@ type GameState = {
   const [dragState, setDragState] = useState<{ fromCol: number, fromRow: number }|null>(null);
 
   // Helper to render a card visually, with click for moving tableau cards
-  function renderCard(card: Card, colIdx: number, rowIdx: number) {
+  function renderCard(card: Card, colIdx: number, rowIdx: number, isTop: boolean) {
     // Can drag any face-up card (regardless of face status of parents)
     const isDraggable = card.faceUp;
     return (
@@ -232,9 +232,9 @@ type GameState = {
               });
             }}
           >
-            {gameState.stock.length ? (
+            gameState.stock.length ? (
   <span style={{ fontSize: 38, lineHeight: 1, display: "block" }}>🂠</span>
-) : ""}
+) : ""
           </div>
         </div>
       </div>
@@ -261,7 +261,7 @@ type GameState = {
             } : undefined}
           >
             {pile.map((card, rowIdx) =>
-              renderCard(card, colIdx, rowIdx)
+              renderCard(card, colIdx, rowIdx, rowIdx === pile.length - 1 && card.faceUp)
             )}
           </div>
         ))}
