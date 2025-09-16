@@ -77,7 +77,9 @@ type GameState = {
       moves: 0
     };
   }
+  // State: gameState and history for undo
   const [gameState, setGameState] = useState<GameState>(generateInitialState);
+  const [history, setHistory] = useState<GameState[]>([]);
   // [click-to-move selection state removed]
   const [dragState, setDragState] = useState<{ fromCol: number, fromRow: number }|null>(null);
 
@@ -168,6 +170,8 @@ type GameState = {
           }
         }
       }
+      // Push current state to history, then update
+      setHistory(prev => [...prev, gameState]);
       setGameState({ ...gameState, tableau: newTableau, completedRuns, moves: gameState.moves + 1 });
     }
   }
@@ -183,11 +187,28 @@ type GameState = {
     return rankValue(card.rank) === rankValue(destCard.rank) - 1 && card.suit === destCard.suit;
   }
 
+  // Undo handler
+  function handleUndo() {
+    if (history.length > 0) {
+      const prevHistory = [...history];
+      const lastState = prevHistory.pop()!;
+      setGameState(lastState);
+      setHistory(prevHistory);
+    }
+  }
+
+  // Modified stock deal and restart button to add current state to history
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <h2>Solitaire</h2>
-        <button onClick={() => setGameState(generateInitialState())} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: "#229", color: "#fff", border: "none", cursor: "pointer" }}>Restart Game</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={handleUndo} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: history.length ? "#229" : "#888", color: "#fff", border: "none", cursor: history.length ? "pointer" : "not-allowed" }} disabled={history.length === 0}>Undo</button>
+          <button onClick={() => {
+            setHistory([]);
+            setGameState(generateInitialState());
+          }} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: "#229", color: "#fff", border: "none", cursor: "pointer" }}>Restart Game</button>
+        </div>
       </div>
       <div style={{ display: "flex", gap: 32, marginBottom: 32 }}>
         <div style={{ fontWeight: 600, fontSize: 18 }}>
@@ -224,6 +245,7 @@ type GameState = {
                   return col;
                 }
               });
+              setHistory(prev => [...prev, gameState]);
               setGameState({
                 ...gameState,
                 tableau,
@@ -232,9 +254,9 @@ type GameState = {
               });
             }}
           >
-            gameState.stock.length ? (
-  <span style={{ fontSize: 38, lineHeight: 1, display: "block" }}>🂠</span>
-) : ""
+            {gameState.stock.length ? (
+              <span style={{ fontSize: 38, lineHeight: 1, display: "block" }}>🂠</span>
+            ) : ""}
           </div>
         </div>
       </div>
