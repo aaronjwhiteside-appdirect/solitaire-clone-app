@@ -1,144 +1,4 @@
-  // Check if there are any playable moves left (tableau-to-tableau, clear, or stock deal)
-  function isAnyMovePossible(state: GameState): boolean {
-    // (1) Foundation-clear possible?
-    for (let col = 0; col < 10; col++) {
-      const pile = state.tableau[col];
-      if (pile.length >= 13) {
-        const last13 = pile.slice(-13);
-        if (
-          last13.every(card => card.suit === last13[0].suit && card.faceUp) &&
-          last13.map(card => card.rank).join(",") === RANKS.slice().reverse().join(",")
-        ) {
-          return true;
-        }
-      }
-    }
-    // (2) Tableau move possible?
-    for (let fromCol = 0; fromCol < 10; fromCol++) {
-      const pile = state.tableau[fromCol];
-      for (let fromRow = 0; fromRow < pile.length; fromRow++) {
-        if (!pile[fromRow].faceUp) continue;
-        const movingCards = pile.slice(fromRow);
-        if (movingCards.length > 1 && !isValidSpiderRun(movingCards)) continue;
-        for (let toCol = 0; toCol < 10; toCol++) {
-          if (toCol === fromCol) continue;
-          const dest = state.tableau[toCol];
-          if (canDropCard(movingCards[0], dest)) {
-            return true;
-          }
-        }
-      }
-    }
-    // (3) Is stock deal possible?
-    if (state.stock.length && state.tableau.every(col => col.length > 0)) {
-      return true;
-    }
-    return false;
-  }
-  // Try to play the next available move: priority is (1) remove a complete K-A in-suit run, (2) move a face-up card or stack to a legal destination, (3) deal from stock if legal.
-  function autoPlayNextMove() {
-    setGameState(currentGameState => {
-      console.log('Auto Play triggered.');
-      // 1. Simulate (not apply) one auto-clear K-to-A run
-      for (let col = 0; col < 10; col++) {
-        const pile = currentGameState.tableau[col];
-        if (pile.length >= 13) {
-          const last13 = pile.slice(-13);
-          if (
-            last13.every(card => card.suit === last13[0].suit && card.faceUp) &&
-            last13.map(card => card.rank).join(",") === RANKS.slice().reverse().join(",")
-          ) {
-            const newTableau = currentGameState.tableau.map((p, i) => i === col ? p.slice(0, p.length - 13) : p);
-            const nextState = { ...currentGameState, tableau: newTableau, completedRuns: currentGameState.completedRuns + 1, moves: currentGameState.moves + 1 };
-            setHistory(prev => [...prev, currentGameState]);
-            setTimeout(() => {
-              if (!isAnyMovePossible(nextState)) setGameIsOver(true);
-            }, 0);
-            return nextState;
-          }
-        }
-      }
-
-      // 2. Simulate a legal tableau move (move face-up card or run)
-      for (let fromCol = 0; fromCol < 10; fromCol++) {
-        const pile = currentGameState.tableau[fromCol];
-        for (let fromRow = 0; fromRow < pile.length; fromRow++) {
-          if (!pile[fromRow].faceUp) continue;
-          const movingCards = pile.slice(fromRow);
-          if (movingCards.length > 1 && !isValidSpiderRun(movingCards)) continue;
-          for (let toCol = 0; toCol < 10; toCol++) {
-            if (toCol === fromCol) continue;
-            const dest = currentGameState.tableau[toCol];
-            if (canDropCard(movingCards[0], dest)) {
-              const newTableau = currentGameState.tableau.map((p, idx) => {
-                if (idx === fromCol) {
-                  return p.slice(0, fromRow);
-                } else if (idx === toCol) {
-                  return [...p, ...movingCards];
-                } else {
-                  return p;
-                }
-              });
-              const justMovedFrom = newTableau[fromCol];
-              if (justMovedFrom.length && !justMovedFrom[justMovedFrom.length-1].faceUp) {
-                justMovedFrom[justMovedFrom.length-1] = {
-                  ...justMovedFrom[justMovedFrom.length-1], faceUp: true };
-              }
-              let completedRuns = currentGameState.completedRuns;
-              for (let col2 = 0; col2 < 10; col2++) {
-                const pile2 = newTableau[col2];
-                if (pile2.length >= 13) {
-                  const last13 = pile2.slice(-13);
-                  if (
-                    last13.every(card => card.suit === last13[0].suit && card.faceUp) &&
-                    last13.map(card => card.rank).join(",") === RANKS.slice().reverse().join(",")
-                  ) {
-                    newTableau[col2] = pile2.slice(0, pile2.length - 13);
-                    completedRuns += 1;
-                  }
-                }
-              }
-              const nextState = { ...currentGameState, tableau: newTableau, completedRuns, moves: currentGameState.moves + 1 };
-              setHistory(prev => [...prev, currentGameState]);
-              setTimeout(() => {
-                if (!isAnyMovePossible(nextState)) setGameIsOver(true);
-              }, 0);
-              return nextState;
-            }
-          }
-        }
-      }
-
-      // 3. Simulate a stock deal
-      if (currentGameState.stock.length && currentGameState.tableau.every(col => col.length > 0)) {
-        let stock = [...currentGameState.stock];
-        const tableau = currentGameState.tableau.map(col => {
-          if (stock.length > 0) {
-            const card = { ...stock.pop()!, faceUp: true };
-            return [...col, card];
-          } else {
-            return col;
-          }
-        });
-        const nextState = {
-          ...currentGameState,
-          tableau,
-          stock,
-          moves: currentGameState.moves + 1
-        };
-        setHistory(prev => [...prev, currentGameState]);
-        setTimeout(() => {
-          if (!isAnyMovePossible(nextState)) setGameIsOver(true);
-        }, 0);
-        return nextState;
-      }
-      // 4. No moves possible
-      setTimeout(() => setGameIsOver(true), 0);
-      return currentGameState;
-    });
-    
-  }
-  }
+// (imports of useState etc. handled below)
 import { useState } from "react";
 
 // Card suits and ranks helper
@@ -202,6 +62,140 @@ function dealSpiderTableau(deck: Card[]): {
 
 
 function Solitaire() {
+  // --- Game Move Logic ---
+  // Detect if any move is possible from the current board state
+  function isAnyMovePossible(state: GameState): boolean {
+    for (let col = 0; col < 10; col++) {
+      const pile = state.tableau[col];
+      if (pile.length >= 13) {
+        const last13 = pile.slice(-13);
+        if (
+          last13.every(card => card.suit === last13[0].suit && card.faceUp) &&
+          last13.map(card => card.rank).join(",") === RANKS.slice().reverse().join(",")
+        ) {
+          return true;
+        }
+      }
+    }
+    for (let fromCol = 0; fromCol < 10; fromCol++) {
+      const pile = state.tableau[fromCol];
+      for (let fromRow = 0; fromRow < pile.length; fromRow++) {
+        if (!pile[fromRow].faceUp) continue;
+        const movingCards = pile.slice(fromRow);
+        if (movingCards.length > 1 && !isValidSpiderRun(movingCards)) continue;
+        for (let toCol = 0; toCol < 10; toCol++) {
+          if (toCol === fromCol) continue;
+          const dest = state.tableau[toCol];
+          if (canDropCard(movingCards[0], dest)) {
+            return true;
+          }
+        }
+      }
+    }
+    if (state.stock.length && state.tableau.every(col => col.length > 0)) {
+      return true;
+    }
+    return false;
+  }
+
+  function autoPlayNextMove() {
+    setGameState(currentGameState => {
+      // 1. Auto-clear in-suit K-A run
+      for (let col = 0; col < 10; col++) {
+        const pile = currentGameState.tableau[col];
+        if (pile.length >= 13) {
+          const last13 = pile.slice(-13);
+          if (
+            last13.every(card => card.suit === last13[0].suit && card.faceUp) &&
+            last13.map(card => card.rank).join(",") === RANKS.slice().reverse().join(",")
+          ) {
+            const newTableau = currentGameState.tableau.map((p, i) => i === col ? p.slice(0, p.length - 13) : p);
+            const nextState = { ...currentGameState, tableau: newTableau, completedRuns: currentGameState.completedRuns + 1, moves: currentGameState.moves + 1 };
+            setHistory(prev => [...prev, currentGameState]);
+            setTimeout(() => {
+              if (!isAnyMovePossible(nextState)) setGameIsOver(true);
+            }, 0);
+            return nextState;
+          }
+        }
+      }
+      // 2. Tableau move
+      for (let fromCol = 0; fromCol < 10; fromCol++) {
+        const pile = currentGameState.tableau[fromCol];
+        for (let fromRow = 0; fromRow < pile.length; fromRow++) {
+          if (!pile[fromRow].faceUp) continue;
+          const movingCards = pile.slice(fromRow);
+          if (movingCards.length > 1 && !isValidSpiderRun(movingCards)) continue;
+          for (let toCol = 0; toCol < 10; toCol++) {
+            if (toCol === fromCol) continue;
+            const dest = currentGameState.tableau[toCol];
+            if (canDropCard(movingCards[0], dest)) {
+              const newTableau = currentGameState.tableau.map((p, idx) => {
+                if (idx === fromCol) {
+                  return p.slice(0, fromRow);
+                } else if (idx === toCol) {
+                  return [...p, ...movingCards];
+                } else {
+                  return p;
+                }
+              });
+              const justMovedFrom = newTableau[fromCol];
+              if (justMovedFrom.length && !justMovedFrom[justMovedFrom.length-1].faceUp) {
+                justMovedFrom[justMovedFrom.length-1] = {
+                  ...justMovedFrom[justMovedFrom.length-1], faceUp: true };
+              }
+              let completedRuns = currentGameState.completedRuns;
+              for (let col2 = 0; col2 < 10; col2++) {
+                const pile2 = newTableau[col2];
+                if (pile2.length >= 13) {
+                  const last13 = pile2.slice(-13);
+                  if (
+                    last13.every(card => card.suit === last13[0].suit && card.faceUp) &&
+                    last13.map(card => card.rank).join(",") === RANKS.slice().reverse().join(",")
+                  ) {
+                    newTableau[col2] = pile2.slice(0, pile2.length - 13);
+                    completedRuns += 1;
+                  }
+                }
+              }
+              const nextState = { ...currentGameState, tableau: newTableau, completedRuns, moves: currentGameState.moves + 1 };
+              setHistory(prev => [...prev, currentGameState]);
+              setTimeout(() => {
+                if (!isAnyMovePossible(nextState)) setGameIsOver(true);
+              }, 0);
+              return nextState;
+            }
+          }
+        }
+      }
+      // 3. Stock deal
+      if (currentGameState.stock.length && currentGameState.tableau.every(col => col.length > 0)) {
+        let stock = [...currentGameState.stock];
+        const tableau = currentGameState.tableau.map(col => {
+          if (stock.length > 0) {
+            const card = { ...stock.pop()!, faceUp: true };
+            return [...col, card];
+          } else {
+            return col;
+          }
+        });
+        const nextState = {
+          ...currentGameState,
+          tableau,
+          stock,
+          moves: currentGameState.moves + 1
+        };
+        setHistory(prev => [...prev, currentGameState]);
+        setTimeout(() => {
+          if (!isAnyMovePossible(nextState)) setGameIsOver(true);
+        }, 0);
+        return nextState;
+      }
+      // 4. No moves possible
+      setTimeout(() => setGameIsOver(true), 0);
+      return currentGameState;
+    });
+  }
 type GameState = {
   tableau: Card[][];
   stock: Card[];
