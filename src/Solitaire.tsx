@@ -1,3 +1,40 @@
+  // Check if there are any playable moves left (tableau-to-tableau, clear, or stock deal)
+  function isAnyMovePossible(state: GameState): boolean {
+    // (1) Foundation-clear possible?
+    for (let col = 0; col < 10; col++) {
+      const pile = state.tableau[col];
+      if (pile.length >= 13) {
+        const last13 = pile.slice(-13);
+        if (
+          last13.every(card => card.suit === last13[0].suit && card.faceUp) &&
+          last13.map(card => card.rank).join(",") === RANKS.slice().reverse().join(",")
+        ) {
+          return true;
+        }
+      }
+    }
+    // (2) Tableau move possible?
+    for (let fromCol = 0; fromCol < 10; fromCol++) {
+      const pile = state.tableau[fromCol];
+      for (let fromRow = 0; fromRow < pile.length; fromRow++) {
+        if (!pile[fromRow].faceUp) continue;
+        const movingCards = pile.slice(fromRow);
+        if (movingCards.length > 1 && !isValidSpiderRun(movingCards)) continue;
+        for (let toCol = 0; toCol < 10; toCol++) {
+          if (toCol === fromCol) continue;
+          const dest = state.tableau[toCol];
+          if (canDropCard(movingCards[0], dest)) {
+            return true;
+          }
+        }
+      }
+    }
+    // (3) Is stock deal possible?
+    if (state.stock.length && state.tableau.every(col => col.length > 0)) {
+      return true;
+    }
+    return false;
+  }
   // Try to play the next available move: priority is (1) remove a complete K-A in-suit run, (2) move a face-up card or stack to a legal destination, (3) deal from stock if legal.
   function autoPlayNextMove() {
     // (1) Auto-clear any full in-suit K-A descending run
@@ -138,9 +175,10 @@ type GameState = {
       moves: 0
     };
   }
-  // State: gameState and history for undo
+  // State: gameState, history, and a game-over flag
   const [gameState, setGameState] = useState<GameState>(generateInitialState);
   const [history, setHistory] = useState<GameState[]>([]);
+  const [gameIsOver, setGameIsOver] = useState<boolean>(false);
   // [click-to-move selection state removed]
   const [dragState, setDragState] = useState<{ fromCol: number, fromRow: number }|null>(null);
 
@@ -233,7 +271,10 @@ type GameState = {
       }
       // Push current state to history, then update
       setHistory(prev => [...prev, gameState]);
-      setGameState({ ...gameState, tableau: newTableau, completedRuns, moves: gameState.moves + 1 });
+      const nextState = { ...gameState, tableau: newTableau, completedRuns, moves: gameState.moves + 1 };
+      setGameState(nextState);
+      // End detection
+      if (!isAnyMovePossible(nextState)) setGameIsOver(true);
     }
   }
 
@@ -255,21 +296,29 @@ type GameState = {
       const lastState = prevHistory.pop()!;
       setGameState(lastState);
       setHistory(prevHistory);
+      setGameIsOver(false); // just in case user brings back a playable board
     }
   }
 
-  // Modified stock deal and restart button to add current state to history
+  // On move or new game, check if game is over (board may be unplayable from the start)
+  // UseEffect would be best, but we do on each relevant state update here anyway
+
+  function handleRestart() {
+    setHistory([]);
+    setGameState(generateInitialState());
+    setGameIsOver(false);
+  }
+
+  // Try also in autoPlay and stock logic!
+
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <h2>Solitaire</h2>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={autoPlayNextMove} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: "#229", color: "#fff", border: "none", cursor: "pointer" }}>Auto Play</button>
-          <button onClick={handleUndo} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: history.length ? "#229" : "#888", color: "#fff", border: "none", cursor: history.length ? "pointer" : "not-allowed" }} disabled={history.length === 0}>Undo</button>
-          <button onClick={() => {
-            setHistory([]);
-            setGameState(generateInitialState());
-          }} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: "#229", color: "#fff", border: "none", cursor: "pointer" }}>Restart Game</button>
+          <button onClick={autoPlayNextMove} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: !gameIsOver ? "#229" : "#888", color: "#fff", border: "none", cursor: !gameIsOver ? "pointer" : "not-allowed" }} disabled={gameIsOver}>Auto Play</button>
+          <button onClick={handleUndo} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: history.length && !gameIsOver ? "#229" : "#888", color: "#fff", border: "none", cursor: history.length && !gameIsOver ? "pointer" : "not-allowed" }} disabled={history.length === 0 || gameIsOver}>Undo</button>
+          <button onClick={handleRestart} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: "#229", color: "#fff", border: "none", cursor: "pointer" }}>Restart Game</button>
         </div>
       </div>
       <div style={{ display: "flex", gap: 32, marginBottom: 32 }}>
@@ -289,13 +338,14 @@ type GameState = {
               alignItems: "center",
               justifyContent: "center",
               color: "#fff",
-              cursor: gameState.stock.length ? "pointer" : "not-allowed",
+              cursor: gameState.stock.length && !gameIsOver ? "pointer" : "not-allowed",
               userSelect: "none",
             }}
             title="Deal one card on top of each stack (if all tableau columns are non-empty)"
             // Stock deal logic will be updated in spider-deal step!
             onClick={() => {
               // Only allow spider-style deal if ALL cols non-empty
+              if (gameIsOver) return;
               if (!gameState.stock.length) return;
               if (gameState.tableau.some(col => col.length === 0)) return;
               let stock = [...gameState.stock];
@@ -308,12 +358,14 @@ type GameState = {
                 }
               });
               setHistory(prev => [...prev, gameState]);
-              setGameState({
+              const nextState = {
                 ...gameState,
                 tableau,
                 stock,
                 moves: gameState.moves + 1
-              });
+              };
+              setGameState(nextState);
+              if (!isAnyMovePossible(nextState)) setGameIsOver(true);
             }}
           >
             {gameState.stock.length ? (
@@ -327,13 +379,13 @@ type GameState = {
         {gameState.tableau.map((pile, colIdx) => (
           <div
             key={`tab-${colIdx}`}
-            style={{ width: 40, minHeight: 300, position: "relative" }}
+            style={{ width: 40, minHeight: 300, position: "relative", opacity: gameIsOver ? 0.6 : 1 }}
             onDragOver={e => {
-              if (dragState) {
+              if (dragState && !gameIsOver) {
                 e.preventDefault();
               }
             }}
-            onDrop={dragState ? (e) => {
+            onDrop={dragState && !gameIsOver ? (e) => {
               e.preventDefault();
               // Drop logic: move if legal (Rules to be handled in next todos)
               const movingCards = gameState.tableau[dragState.fromCol].slice(dragState.fromRow);
@@ -350,7 +402,19 @@ type GameState = {
           </div>
         ))}
       </div>
-      {/* Selection banner removed for drag-and-drop-only play */}
+      {/* Game over overlay */}
+      {gameIsOver && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: 1000,
+          background: "rgba(80,80,80,0.48)", display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          <div style={{ background: '#222', color: 'white', padding: '2em 3em', borderRadius: 8, textAlign: 'center' }}>
+            <h2 style={{marginBottom: 12}}>No more moves!</h2>
+            <p style={{marginBottom: 12}}>There are no further moves available. The round is over.</p>
+            <button onClick={handleRestart} style={{ fontSize: 18, padding: "8px 28px", borderRadius: 5, background: "#337", color: "#fff", border: "none", cursor: "pointer" }}>Start Again</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
