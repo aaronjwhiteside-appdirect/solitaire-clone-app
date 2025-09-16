@@ -1,3 +1,64 @@
+  // Try to play the next available move: priority is (1) remove a complete K-A in-suit run, (2) move a face-up card or stack to a legal destination, (3) deal from stock if legal.
+  function autoPlayNextMove() {
+    // (1) Auto-clear any full in-suit K-A descending run
+    for (let col = 0; col < 10; col++) {
+      const pile = gameState.tableau[col];
+      if (pile.length >= 13) {
+        const last13 = pile.slice(-13);
+        if (
+          last13.every(card => card.suit === last13[0].suit && card.faceUp) &&
+          last13.map(card => card.rank).join(",") === RANKS.slice().reverse().join(",")
+        ) {
+          // Simulate moving the sequence to foundation (removal)
+          const newTableau = gameState.tableau.map((p, i) => i === col ? p.slice(0, p.length - 13) : p);
+          setHistory(prev => [...prev, gameState]);
+          setGameState({ ...gameState, tableau: newTableau, completedRuns: gameState.completedRuns + 1, moves: gameState.moves + 1 });
+          return;
+        }
+      }
+    }
+    // (2) Move face-up card(s) to a legal tableau destination if possible
+    for (let fromCol = 0; fromCol < 10; fromCol++) {
+      const pile = gameState.tableau[fromCol];
+      // Only check topmost face-up continuous runs
+      for (let fromRow = 0; fromRow < pile.length; fromRow++) {
+        if (!pile[fromRow].faceUp) continue;
+        const movingCards = pile.slice(fromRow);
+        if (movingCards.length > 1 && !isValidSpiderRun(movingCards)) continue;
+        for (let toCol = 0; toCol < 10; toCol++) {
+          if (toCol === fromCol) continue;
+          const dest = gameState.tableau[toCol];
+          if (canDropCard(movingCards[0], dest)) {
+            doTableauMove(fromCol, fromRow, toCol);
+            return;
+          }
+        }
+      }
+    }
+    // (3) Deal from stock if legal
+    if (gameState.stock.length && gameState.tableau.every(col => col.length > 0)) {
+      // Simulate stock card deal
+      let stock = [...gameState.stock];
+      const tableau = gameState.tableau.map(col => {
+        if (stock.length > 0) {
+          const card = { ...stock.pop()!, faceUp: true };
+          return [...col, card];
+        } else {
+          return col;
+        }
+      });
+      setHistory(prev => [...prev, gameState]);
+      setGameState({
+        ...gameState,
+        tableau,
+        stock,
+        moves: gameState.moves + 1
+      });
+      return;
+    }
+    // No move possible
+    return;
+  }
 import { useState } from "react";
 
 // Card suits and ranks helper
@@ -203,6 +264,7 @@ type GameState = {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <h2>Solitaire</h2>
         <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={autoPlayNextMove} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: "#229", color: "#fff", border: "none", cursor: "pointer" }}>Auto Play</button>
           <button onClick={handleUndo} style={{ fontSize: 16, padding: "4px 14px", borderRadius: 4, background: history.length ? "#229" : "#888", color: "#fff", border: "none", cursor: history.length ? "pointer" : "not-allowed" }} disabled={history.length === 0}>Undo</button>
           <button onClick={() => {
             setHistory([]);
