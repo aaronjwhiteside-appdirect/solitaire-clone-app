@@ -46,10 +46,11 @@
           last13.every(card => card.suit === last13[0].suit && card.faceUp) &&
           last13.map(card => card.rank).join(",") === RANKS.slice().reverse().join(",")
         ) {
-          // Simulate moving the sequence to foundation (removal)
           const newTableau = gameState.tableau.map((p, i) => i === col ? p.slice(0, p.length - 13) : p);
           setHistory(prev => [...prev, gameState]);
-          setGameState({ ...gameState, tableau: newTableau, completedRuns: gameState.completedRuns + 1, moves: gameState.moves + 1 });
+          const nextState = { ...gameState, tableau: newTableau, completedRuns: gameState.completedRuns + 1, moves: gameState.moves + 1 };
+          setGameState(nextState);
+          if (!isAnyMovePossible(nextState)) setGameIsOver(true);
           return;
         }
       }
@@ -57,7 +58,6 @@
     // (2) Move face-up card(s) to a legal tableau destination if possible
     for (let fromCol = 0; fromCol < 10; fromCol++) {
       const pile = gameState.tableau[fromCol];
-      // Only check topmost face-up continuous runs
       for (let fromRow = 0; fromRow < pile.length; fromRow++) {
         if (!pile[fromRow].faceUp) continue;
         const movingCards = pile.slice(fromRow);
@@ -74,7 +74,6 @@
     }
     // (3) Deal from stock if legal
     if (gameState.stock.length && gameState.tableau.every(col => col.length > 0)) {
-      // Simulate stock card deal
       let stock = [...gameState.stock];
       const tableau = gameState.tableau.map(col => {
         if (stock.length > 0) {
@@ -85,15 +84,18 @@
         }
       });
       setHistory(prev => [...prev, gameState]);
-      setGameState({
+      const nextState = {
         ...gameState,
         tableau,
         stock,
         moves: gameState.moves + 1
-      });
+      };
+      setGameState(nextState);
+      if (!isAnyMovePossible(nextState)) setGameIsOver(true);
       return;
     }
-    // No move possible
+    // No move possible: mark game over if not already
+    setGameIsOver(true);
     return;
   }
 import { useState } from "react";
