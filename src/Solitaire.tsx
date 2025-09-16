@@ -232,7 +232,9 @@ type GameState = {
               });
             }}
           >
-            {gameState.stock.length ? "🂠" : ""}
+            gameState.stock.length ? (
+  <span style={{ fontSize: 38, lineHeight: 1, display: "block" }}>🂠</span>
+) : ""
           </div>
         </div>
       </div>
